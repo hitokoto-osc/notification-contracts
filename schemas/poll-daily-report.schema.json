@@ -2,6 +2,11 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "PollDailyReportMessage",
   "description": "每日审核员报告。\n\n**不含句子信息底座**：消费侧类型没有内嵌 `HitokotoBaseMessage`，因此没有 `uuid` / `hitokoto` / `type` 等字段。",
+  "allOf": [
+    {
+      "$ref": "./common/event-id.schema.json"
+    }
+  ],
   "type": "object",
   "required": [
     "created_at",

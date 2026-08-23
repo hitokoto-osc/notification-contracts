@@ -96,7 +96,28 @@ hitokoto-osc 通知域 RabbitMQ 消息契约的**单一事实源**。
 
 ---
 
-## 3. 时间字段能填什么
+## 3. event_id 怎么填
+
+所有业务消息都接受一个**可选**的顶层字段 `event_id`：
+
+```json
+{ "event_id": "0191d9c6-6f7c-7c3a-9f4e-3f5b2c1d8a90", "to": "..." }
+```
+
+它是这条事件的不可变身份，语义对齐 CloudEvents 的 `id`。三条规则：
+
+1. **推荐 UUIDv7**。自带时间序，消费侧可以按前缀清理去重桶。
+2. **重发必须复用同一个值**。同一逻辑事件重试、补发、回放时换了新值，去重就失效了。
+3. **不填也合法**。消费侧此时回退到对规范化字段求哈希的启发式去重键，
+   精度低于精确幂等——能填就填。
+
+> **别和 `id` 搞混。** `poll_created` / `poll_finished` 里的 `id` 是**整数投票标识**，
+> 与事件身份无关。契约刻意没有复用 `id` 这个名字：它在这两条消息里已经被整数占用，
+> 再塞一个字符串进去会产生同一字段要求两种类型的不可满足 schema。
+
+---
+
+## 4. 时间字段能填什么
 
 所有时间字段（`created_at` / `operated_at` / `updated_at`）都是**字符串**，五种形态：
 
@@ -115,7 +136,7 @@ hitokoto-osc 通知域 RabbitMQ 消息契约的**单一事实源**。
 
 ---
 
-## 4. 死信机制
+## 5. 死信机制
 
 ```text
                  ┌──────────────────────────┐
@@ -143,7 +164,7 @@ hitokoto-osc 通知域 RabbitMQ 消息契约的**单一事实源**。
 
 ---
 
-## 5. AsyncAPI AMQP binding 的能力边界
+## 6. AsyncAPI AMQP binding 的能力边界
 
 `asyncapi.yaml` 用的 AMQP binding 是 `0.3.0`。它**表达不了**这些东西：
 
@@ -163,22 +184,39 @@ hitokoto-osc 通知域 RabbitMQ 消息契约的**单一事实源**。
 **不要把这些字段塞进 `bindings.amqp` 内部**——那会破坏 binding schema 校验。
 这是 binding 的真实能力边界，不是本仓偷懒。
 
-### 两个工具链上的坑（都已固化成检查，改之前先读）
+### 工具链的三个实测结论（都已固化成检查，改之前先读）
 
-**schema 一律不写 `$id`。** `asyncapi bundle` 会把 `$id` 当作解析相对 `$ref` 的 base URI。
-一旦 `$id` 是 `https://…`，`$ref: "./common/hitokoto-base.schema.json"` 就会被解析成一个
-远程地址并尝试下载，bundle 直接失败——而 `asyncapi validate` 却会放行，形成
-"validate 绿、bundle 红"的陷阱。`scripts/validate-examples.mjs` 会在发现任何 `$id` 时报错。
+**一、schema 一律不写 `$id`。**
+`asyncapi bundle` 会把 `$id` 当作解析相对 `$ref` 的 base URI。一旦 `$id` 是 `https://…`，
+`$ref: "./common/hitokoto-base.schema.json"` 就会被解析成一个远程地址并尝试下载，bundle 直接失败——
+而 `asyncapi validate` 却会放行，形成“validate 绿、bundle 红”的陷阱。
+`scripts/validate-examples.mjs` 会在发现任何 `$id` 时报错。
 
-**`asyncapi diff --type breaking` 拦不住拓扑变更。** 实测：改 routing key 会被判为
-breaking（拦得住）；但改 `x-rabbitmq-queue.arguments.x-dead-letter-exchange` 只会出现在
-`--type all` 里，`--type breaking` 完全看不到。所以 CI 额外跑
-`scripts/check-topology-compat.mjs` 逐字段比对 baseline 与 candidate 的拓扑。
-这一步是必需的兜底，删掉它 DLX 就能被悄悄改掉。
+**二、`asyncapi diff --type breaking` 的覆盖面比想象中窄得多。**
+这是在本仓实测出来的，不是推测：
+
+| 改动 | `--type breaking` 的表现 | 谁来拦 |
+| --- | --- | --- |
+| 改 `channel.address`（routing key） | 判为 breaking，非零退出 | `asyncapi diff` ✅ |
+| 改 `x-rabbitmq-queue` 里的 DLX / queue 名 | 只出现在 `--type all`，breaking 里看不到 | `check-topology-compat.mjs` |
+| 改 `x-consumer` 的 tag / prefetch | 同上 | `check-topology-compat.mjs` |
+| payload 的 `required` 新增字段 | **返回 `[]` 且以 0 退出**，完全无感 | `check-payload-compat.mjs` |
+| payload 删字段 / 删 enum 取值 | 同上 | `check-payload-compat.mjs` |
+| `info.version` 递增 | **误判为 breaking** | `diff-overrides.json` 改判 non-breaking |
+
+换句话说，`asyncapi diff` 只守住了结构层，拓扑与 payload 兼容性各自需要一个自写断言。
+这两个脚本不是冗余，删掉任何一个，对应那一列就彻底失防。
+
+**三、`info.version` 递增会被判成破坏性变更。**
+不加处理的话每个发版 PR 都会被自己的门禁拦下。`diff-overrides.json` 把 `/info/version`
+改判为 non-breaking，CI 的 diff 步骤带 `--overrides` 运行。
+
+> bundle 出来的文档里还带着解析器生成的 `x-parser-schema-id`，任何 payload 改动都会让它们
+> 整体位移，`--type all` 因此会刷出上千条 `unclassified` 噪声。只看 `--type breaking` 即可。
 
 ---
 
-## 6. 我要改契约
+## 7. 我要改契约
 
 ```bash
 pnpm install --frozen-lockfile
@@ -190,15 +228,16 @@ CI 会做的事：
 
 1. candidate 与 baseline **各自** `pnpm install` + `pnpm test` + `pnpm run bundle`
    （外置 `$ref` 必须在各自 revision 下解析，否则 diff 失真）
-2. `asyncapi diff baseline candidate --type breaking` —— 破坏性变更非零退出
-3. `scripts/check-topology-compat.mjs` —— 拓扑逐字段比对
+2. `asyncapi diff baseline candidate --type breaking --overrides diff-overrides.json`
+3. `scripts/check-topology-compat.mjs` —— 拓扑逐字段比对（`topology-change` 标签可跳过）
+4. `scripts/check-payload-compat.mjs` —— payload 收紧检测（`breaking-change` 标签可跳过）
 
 ### SemVer 判定
 
 | 改动 | 版本 |
 | --- | --- |
 | 加一个可选字段、放宽约束、补文档 | MINOR |
-| 收紧约束、加必填字段、改枚举取值 | MAJOR |
+| 收紧约束、加必填字段、改枚举取值 | MAJOR，且必须打 `breaking-change` 标签 |
 | 改 routing key / queue / exchange / DLX | MAJOR，且必须打 `topology-change` 标签 |
 | 纯 description / 样本修正 | PATCH |
 
@@ -217,7 +256,7 @@ CI 会做的事：
 
 ---
 
-## 7. 消费方 / 生产方如何接入
+## 8. 消费方 / 生产方如何接入
 
 **方式一：git submodule**（`notification_worker` 用的就是这个）
 

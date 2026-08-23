@@ -3,6 +3,11 @@
   "title": "HitokotoBaseMessage",
   "description": "六条业务消息共享的句子信息底座。\n\n**不设 `additionalProperties: false`**：消费侧用 sonic 反序列化，未知字段被静默忽略；收紧会把现存流量判成不合规。",
   "type": "object",
+  "allOf": [
+    {
+      "$ref": "./event-id.schema.json"
+    }
+  ],
   "required": [
     "to",
     "uuid",

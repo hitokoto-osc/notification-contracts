@@ -76,14 +76,27 @@ jobs:
       - name: Reject breaking AsyncAPI changes
         if: steps.baseline.outputs.present == 'true'
         working-directory: candidate
-        run: pnpm exec asyncapi diff ../baseline/dist/asyncapi.bundled.yaml dist/asyncapi.bundled.yaml --type breaking
+        run: >-
+          pnpm exec asyncapi diff
+          ../baseline/dist/asyncapi.bundled.yaml dist/asyncapi.bundled.yaml
+          --type breaking --overrides diff-overrides.json
 
-      # 上一步覆盖不到拓扑：queue 名、DLX 参数、consumer tag、prefetch 都放在
-      # x-rabbitmq-queue / x-consumer 扩展里，实测 `asyncapi diff` 能看见这些改动
-      # 但归类为非破坏，`--type breaking` 因此不会拦。这一步是必需的兜底，不是冗余。
+      # 下面两步不是冗余。实测 `asyncapi diff --type breaking` 的覆盖面比预期窄得多：
+      #   channel.address（routing key）  → 判为 breaking，拦得住
+      #   x-rabbitmq-queue 里的 DLX 等     → 只出现在 --type all，拦不住
+      #   payload 的 required 新增字段     → 返回 [] 且 exit 0，完全无感
+      #   info.version 递增               → 误判为 breaking（已由 diff-overrides.json 修正）
+      # 拓扑与 payload 兼容性因此各自需要一个自写断言兜底。
       - name: Reject RabbitMQ topology changes
         if: >-
           steps.baseline.outputs.present == 'true' &&
           !contains(github.event.pull_request.labels.*.name, 'topology-change')
         working-directory: candidate
         run: node scripts/check-topology-compat.mjs ../baseline/asyncapi.yaml asyncapi.yaml
+
+      - name: Reject breaking payload changes
+        if: >-
+          steps.baseline.outputs.present == 'true' &&
+          !contains(github.event.pull_request.labels.*.name, 'breaking-change')
+        working-directory: candidate
+        run: node scripts/check-payload-compat.mjs ../baseline/schemas schemas

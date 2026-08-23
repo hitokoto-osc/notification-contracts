@@ -1,6 +1,6 @@
 {
   "name": "@hitokoto-osc/notification-contracts",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "AsyncAPI 3.0 contracts for the hitokoto-osc notification domain (RabbitMQ)",
   "private": true,
   "type": "module",
@@ -17,7 +17,8 @@
     "test:examples": "node scripts/validate-examples.mjs",
     "check:version": "node scripts/check-version.mjs",
     "check:topology": "node scripts/check-topology-compat.mjs",
-    "test": "pnpm run validate && pnpm run test:examples && pnpm run check:version"
+    "test": "pnpm run validate && pnpm run test:examples && pnpm run check:version",
+    "check:payload": "node scripts/check-payload-compat.mjs"
   },
   "devDependencies": {
     "@asyncapi/cli": "6.0.2",
