@@ -1,0 +1,60 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "PollFinishedMessage",
+  "description": "投票结束、通知参与过的审核员。",
+  "allOf": [
+    {
+      "$ref": "./common/hitokoto-base.schema.json"
+    }
+  ],
+  "type": "object",
+  "required": [
+    "id",
+    "updated_at",
+    "user_name",
+    "status",
+    "method",
+    "point"
+  ],
+  "properties": {
+    "id": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "**投票标识（整数）**，不是事件标识。事件身份请用 `event_id`。"
+    },
+    "updated_at": {
+      "$ref": "./common/time.schema.json"
+    },
+    "user_name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "收信审核员的名称。"
+    },
+    "status": {
+      "allOf": [
+        {
+          "$ref": "./enums/poll-status.schema.json"
+        },
+        {
+          "not": {
+            "const": 0
+          }
+        }
+      ],
+      "description": "投票最终结果，典型取值 `200` 入库 / `201` 驳回 / `202` 需要修改。\n\n排除 `0` 是刻意的：消费侧标了 `validate:\"required\"`，对整数而言等价于「非 0」，发 `0` 会被判为校验失败并进入死信。"
+    },
+    "method": {
+      "allOf": [
+        {
+          "$ref": "./enums/poll-method.schema.json"
+        }
+      ],
+      "description": "收信审核员本人的投票方式。"
+    },
+    "point": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "该审核员投出的票数（权重）。消费侧标了 `validate:\"required\"`，等价于「非 0」。"
+    }
+  }
+}

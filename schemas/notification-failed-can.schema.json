@@ -1,0 +1,20 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "NotificationFailedCanMessage",
+  "description": "死信桶（can 队列）的包装体。\n\n**只有 can 队列是包装体。** 死信收集器（collector 队列）收到的是原始业务 payload，不是这个结构——不要把两者搞混。\n\n由 `notification_worker` 自己产生（`wrapperHeader`），外部生产者不应向 can 队列投递。",
+  "type": "object",
+  "required": [
+    "header",
+    "body"
+  ],
+  "properties": {
+    "header": {
+      "type": "object",
+      "description": "原始 delivery 的 AMQP headers，含 broker 注入的 `x-death` / `x-first-death-exchange` / `x-first-death-queue`。"
+    },
+    "body": {
+      "type": "string",
+      "description": "原始消息体，**以 JSON 字符串形式内嵌**（不是嵌套对象）。需要先解析外层，再对本字段做一次 JSON 解析。"
+    }
+  }
+}

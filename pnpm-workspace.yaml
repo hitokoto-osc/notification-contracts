@@ -1,0 +1,11 @@
+# 这些包的安装脚本一律不执行：契约仓只做校验与文档生成，不需要任何原生构建，
+# 关掉后 CI 与本地的 install 结果才是确定的。
+allowBuilds:
+  '@asyncapi/cli': false
+  '@hyperjump/json-pointer': false
+  '@hyperjump/json-schema': false
+  '@hyperjump/json-schema-core': false
+  '@hyperjump/pact': false
+  '@scarf/scarf': false
+  puppeteer: false
+  yarn: false

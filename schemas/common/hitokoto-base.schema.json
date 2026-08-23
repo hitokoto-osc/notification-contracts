@@ -1,0 +1,58 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "HitokotoBaseMessage",
+  "description": "六条业务消息共享的句子信息底座。\n\n**不设 `additionalProperties: false`**：消费侧用 sonic 反序列化，未知字段被静默忽略；收紧会把现存流量判成不合规。",
+  "type": "object",
+  "required": [
+    "to",
+    "uuid",
+    "hitokoto",
+    "from",
+    "type",
+    "creator",
+    "created_at"
+  ],
+  "properties": {
+    "to": {
+      "type": "string",
+      "format": "email",
+      "description": "收信人邮件地址。"
+    },
+    "uuid": {
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+      "description": "句子 UUID。**必须是 v4**——消费侧的校验标签是 `uuid4`，不是通用 UUID。",
+      "examples": [
+        "701fd013-65eb-4813-85e3-0f74bc53a95f"
+      ]
+    },
+    "hitokoto": {
+      "type": "string",
+      "minLength": 1,
+      "description": "句子正文。"
+    },
+    "from": {
+      "type": "string",
+      "minLength": 1,
+      "description": "句子来源（作品名）。"
+    },
+    "type": {
+      "$ref": "../enums/hitokoto-type.schema.json"
+    },
+    "from_who": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "句子作者。可为 `null`（消费侧是 `*string`）。"
+    },
+    "creator": {
+      "type": "string",
+      "minLength": 1,
+      "description": "投稿者名称。"
+    },
+    "created_at": {
+      "$ref": "./time.schema.json"
+    }
+  }
+}

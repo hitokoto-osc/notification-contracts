@@ -1,0 +1,27 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "PollCreatedMessage",
+  "description": "新投票创建、通知审核员前来投票。",
+  "allOf": [
+    {
+      "$ref": "./common/hitokoto-base.schema.json"
+    }
+  ],
+  "type": "object",
+  "required": [
+    "user_name",
+    "id"
+  ],
+  "properties": {
+    "user_name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "收信审核员的名称。注意不是 `creator`（那是投稿者）。"
+    },
+    "id": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "**投票标识（整数）**，不是事件标识。事件身份请用 `event_id`。"
+    }
+  }
+}

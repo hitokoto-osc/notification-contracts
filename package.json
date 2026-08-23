@@ -1,0 +1,31 @@
+{
+  "name": "@hitokoto-osc/notification-contracts",
+  "version": "1.0.0",
+  "description": "AsyncAPI 3.0 contracts for the hitokoto-osc notification domain (RabbitMQ)",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "repository": "https://github.com/hitokoto-osc/notification-contracts",
+  "packageManager": "pnpm@11.22.0",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "validate": "asyncapi validate asyncapi.yaml",
+    "bundle": "node scripts/ensure-dist.mjs && asyncapi bundle asyncapi.yaml --output dist/asyncapi.bundled.yaml",
+    "docs": "asyncapi generate fromTemplate asyncapi.yaml @asyncapi/html-template --output dist/docs --force-write",
+    "test:examples": "node scripts/validate-examples.mjs",
+    "check:version": "node scripts/check-version.mjs",
+    "check:topology": "node scripts/check-topology-compat.mjs",
+    "test": "pnpm run validate && pnpm run test:examples && pnpm run check:version"
+  },
+  "devDependencies": {
+    "@asyncapi/cli": "6.0.2",
+    "@asyncapi/html-template": "3.5.6",
+    "@commitlint/cli": "21.2.2",
+    "@commitlint/config-conventional": "21.2.2",
+    "ajv": "8.20.0",
+    "ajv-formats": "3.0.1",
+    "yaml": "2.9.0"
+  }
+}

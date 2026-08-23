@@ -1,0 +1,39 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "HitokotoMovedMessage",
+  "description": "句子被管理员移动分类后的通知。",
+  "allOf": [
+    {
+      "$ref": "./common/hitokoto-base.schema.json"
+    }
+  ],
+  "type": "object",
+  "required": [
+    "operated_at",
+    "operator_username",
+    "operator_uid"
+  ],
+  "properties": {
+    "operated_at": {
+      "$ref": "./common/time.schema.json"
+    },
+    "operator_username": {
+      "type": "string",
+      "minLength": 1,
+      "description": "操作者用户名。"
+    },
+    "operator_uid": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "操作者 UID。消费侧类型是 `uint` 且标了 `validate:\"required\"`，等价于「非 0 正整数」。"
+    },
+    "operate": {
+      "allOf": [
+        {
+          "$ref": "./enums/poll-status.schema.json"
+        }
+      ],
+      "description": "操作结果。\n\n**未列入 `required`**：消费侧这个字段没有 `validate` 标签，缺失时会落到零值 `0`（NotOpen）。这是已知的偏松处，见 CHANGELOG。"
+    }
+  }
+}

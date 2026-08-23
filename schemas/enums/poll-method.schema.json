@@ -1,0 +1,18 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "PollMethod",
+  "description": "审核员的投票方式。注意与 PollStatus 区分：PollMethod 描述**单个审核员投了什么票**，PollStatus 描述**整个投票的结果**。\n\n| 值 | 名称 | 含义 |\n| --- | --- | --- |\n| `1` | Approve | 赞同 |\n| `2` | Reject | 驳回 |\n| `3` | NeedModify | 需要修改 |\n| `4` | NeedCommonUserPoll | 需要普通用户投票 |",
+  "type": "integer",
+  "enum": [
+    1,
+    2,
+    3,
+    4
+  ],
+  "x-enumNames": [
+    "Approve",
+    "Reject",
+    "NeedModify",
+    "NeedCommonUserPoll"
+  ]
+}

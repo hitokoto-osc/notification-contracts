@@ -1,0 +1,5 @@
+# 仓库统一以 LF 存储与检出。
+#
+# 契约文件被四个异构消费方直接 vendor，schema 的字节内容参与 asyncapi diff 与
+# ajv 校验；一旦让 core.autocrlf 决定检出行尾，跨平台贡献者会产生无意义的整文件 diff。
+* text=auto eol=lf

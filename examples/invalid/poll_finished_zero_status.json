@@ -1,0 +1,16 @@
+{
+  "to": "reviewer@example.com",
+  "uuid": "701fd013-65eb-4813-85e3-0f74bc53a95f",
+  "hitokoto": "衣带渐宽终不悔，为伊消得人憔悴。",
+  "from": "蝶恋花",
+  "from_who": "柳永",
+  "type": "i",
+  "creator": "投稿者丙",
+  "created_at": "1696347595",
+  "id": 1000,
+  "updated_at": "1696350000",
+  "user_name": "审核员甲",
+  "status": 0,
+  "method": 1,
+  "point": 2
+}

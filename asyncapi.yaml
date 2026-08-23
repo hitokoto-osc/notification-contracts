@@ -1,0 +1,462 @@
+asyncapi: 3.0.0
+
+info:
+  title: Hitokoto Notification Contracts
+  version: 1.0.0
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+  description: |
+    hitokoto-osc 通知域 RabbitMQ 消息契约的单一事实源。
+
+    消费方为 `hitokoto-osc/notification_worker`；生产方目前有 Go / PHP / JS / Rust 四个服务。
+
+    ## 契约的方向性
+
+    本文档描述的是**生产者被允许发送什么**，不是消费者能容忍什么（Postel's law）。
+    消费者比契约更宽松 = 合规；消费者比契约更严格 = 缺陷。回归测试的断言方向恒为
+    `examples/ → Go validator 必须通过`，正是为了抓后一种情况。
+
+    ## AsyncAPI AMQP binding 的能力边界
+
+    binding `0.3.0` 无法表达 routing key 字段、queue arguments（`x-dead-letter-*`）、
+    exchange↔queue 绑定关系、consumer tag、prefetch。本文档因此约定：
+
+      - routing key   → `channel.address`（binding 用 `is: routingKey`）
+      - queue + DLX   → channel 上的 `x-rabbitmq-queue` 扩展
+      - consumer 配置 → operation 上的 `x-consumer` 扩展
+
+    **请勿把这些字段塞进 `bindings.amqp`**，那会破坏 binding schema 校验。
+
+    ## 死信拓扑
+
+    六个业务队列的 `x-dead-letter-routing-key` 全部指向 `notification_failed_collector`。
+    收集器按 `x-death` 累计次数做 4^n 秒指数退避重投递，超过 5 次转投 `notification_failed_can`
+    死信桶。**收集器收到的是原始业务 payload**；只有投递到 can 队列时才会被
+    `{header, body}` 包装（见 `NotificationFailedCanMessage`）。
+
+defaultContentType: application/json
+
+servers:
+  rabbitmq:
+    host: '{host}:{port}'
+    pathname: '/'
+    protocol: amqp
+    protocolVersion: 0-9-1
+    description: 部署相关，非契约的一部分。
+    variables:
+      host:
+        default: localhost
+      port:
+        default: '5672'
+
+channels:
+  hitokotoAppended:
+    address: notification.hitokoto_appended
+    title: 句子投稿成功
+    servers:
+      - $ref: '#/servers/rabbitmq'
+    messages:
+      hitokotoAppended:
+        $ref: '#/components/messages/hitokotoAppended'
+    bindings:
+      amqp:
+        is: routingKey
+        exchange:
+          name: notification
+          type: direct
+          durable: true
+          autoDelete: false
+          vhost: /
+        bindingVersion: 0.3.0
+    x-rabbitmq-queue:
+      name: hitokoto_appended
+      durable: true
+      autoDelete: false
+      exclusive: false
+      arguments:
+        x-dead-letter-exchange: notification_failed
+        x-dead-letter-routing-key: notification_failed.notification_failed_collector
+
+  hitokotoReviewed:
+    address: notification.hitokoto_reviewed
+    title: 句子审核完成
+    servers:
+      - $ref: '#/servers/rabbitmq'
+    messages:
+      hitokotoReviewed:
+        $ref: '#/components/messages/hitokotoReviewed'
+    bindings:
+      amqp:
+        is: routingKey
+        exchange:
+          name: notification
+          type: direct
+          durable: true
+          autoDelete: false
+          vhost: /
+        bindingVersion: 0.3.0
+    x-rabbitmq-queue:
+      name: hitokoto_reviewed
+      durable: true
+      autoDelete: false
+      exclusive: false
+      arguments:
+        x-dead-letter-exchange: notification_failed
+        x-dead-letter-routing-key: notification_failed.notification_failed_collector
+
+  hitokotoMoved:
+    address: notification.hitokoto_moved
+    title: 句子被移动分类
+    servers:
+      - $ref: '#/servers/rabbitmq'
+    messages:
+      hitokotoMoved:
+        $ref: '#/components/messages/hitokotoMoved'
+    bindings:
+      amqp:
+        is: routingKey
+        exchange:
+          name: notification
+          type: direct
+          durable: true
+          autoDelete: false
+          vhost: /
+        bindingVersion: 0.3.0
+    x-rabbitmq-queue:
+      name: hitokoto_moved
+      durable: true
+      autoDelete: false
+      exclusive: false
+      arguments:
+        x-dead-letter-exchange: notification_failed
+        x-dead-letter-routing-key: notification_failed.notification_failed_collector
+
+  hitokotoPollCreated:
+    address: notification.hitokoto_poll_created
+    title: 投票创建
+    servers:
+      - $ref: '#/servers/rabbitmq'
+    messages:
+      pollCreated:
+        $ref: '#/components/messages/pollCreated'
+    bindings:
+      amqp:
+        is: routingKey
+        exchange:
+          name: notification
+          type: direct
+          durable: true
+          autoDelete: false
+          vhost: /
+        bindingVersion: 0.3.0
+    x-rabbitmq-queue:
+      name: hitokoto_poll_created
+      durable: true
+      autoDelete: false
+      exclusive: false
+      arguments:
+        x-dead-letter-exchange: notification_failed
+        x-dead-letter-routing-key: notification_failed.notification_failed_collector
+
+  hitokotoPollFinished:
+    address: notification.hitokoto_poll_finished
+    title: 投票结束
+    servers:
+      - $ref: '#/servers/rabbitmq'
+    messages:
+      pollFinished:
+        $ref: '#/components/messages/pollFinished'
+    bindings:
+      amqp:
+        is: routingKey
+        exchange:
+          name: notification
+          type: direct
+          durable: true
+          autoDelete: false
+          vhost: /
+        bindingVersion: 0.3.0
+    x-rabbitmq-queue:
+      name: hitokoto_poll_finished
+      durable: true
+      autoDelete: false
+      exclusive: false
+      arguments:
+        x-dead-letter-exchange: notification_failed
+        x-dead-letter-routing-key: notification_failed.notification_failed_collector
+
+  hitokotoPollDailyReport:
+    address: notification.hitokoto_poll_daily_report
+    title: 每日审核员报告
+    servers:
+      - $ref: '#/servers/rabbitmq'
+    messages:
+      pollDailyReport:
+        $ref: '#/components/messages/pollDailyReport'
+    bindings:
+      amqp:
+        is: routingKey
+        exchange:
+          name: notification
+          type: direct
+          durable: true
+          autoDelete: false
+          vhost: /
+        bindingVersion: 0.3.0
+    x-rabbitmq-queue:
+      name: hitokoto_poll_daily_report
+      durable: true
+      autoDelete: false
+      exclusive: false
+      arguments:
+        x-dead-letter-exchange: notification_failed
+        x-dead-letter-routing-key: notification_failed.notification_failed_collector
+
+  notificationFailedCollector:
+    address: notification_failed.notification_failed_collector
+    title: 死信收集器
+    description: |
+      六个业务队列的死信落点。**载荷是原始业务消息，不是包装体**——broker 死信转发不会
+      改写 body，只会追加 `x-death` / `x-first-death-*` 头部。
+
+      本队列的死信路由指回自身，因此收集器的 handler 对不可解析的头部**不能返回错误**
+      （会造成热循环），只能转投死信桶。
+    servers:
+      - $ref: '#/servers/rabbitmq'
+    messages:
+      notificationFailedCollector:
+        $ref: '#/components/messages/notificationFailedCollector'
+    bindings:
+      amqp:
+        is: routingKey
+        exchange:
+          name: notification_failed
+          type: direct
+          durable: true
+          autoDelete: false
+          vhost: /
+        bindingVersion: 0.3.0
+    x-rabbitmq-queue:
+      name: notification_failed_collector
+      durable: true
+      autoDelete: false
+      exclusive: false
+      arguments:
+        x-dead-letter-exchange: notification_failed
+        x-dead-letter-routing-key: notification_failed.notification_failed_collector
+
+  notificationFailedCan:
+    address: notification_failed.notification_failed_can
+    title: 死信桶
+    description: |
+      不可恢复消息的终点。**唯一使用 `{header, body}` 包装体的队列**，由
+      `notification_worker` 自己投递，外部生产者不应向此路由发消息。
+    servers:
+      - $ref: '#/servers/rabbitmq'
+    messages:
+      notificationFailedCan:
+        $ref: '#/components/messages/notificationFailedCan'
+    bindings:
+      amqp:
+        is: routingKey
+        exchange:
+          name: notification_failed
+          type: direct
+          durable: true
+          autoDelete: false
+          vhost: /
+        bindingVersion: 0.3.0
+    x-rabbitmq-queue:
+      name: notification_failed_can
+      durable: true
+      autoDelete: false
+      exclusive: false
+      arguments:
+        x-dead-letter-exchange: notification_failed
+        x-dead-letter-routing-key: notification_failed.notification_failed_collector
+
+operations:
+  receiveHitokotoAppended:
+    action: receive
+    channel:
+      $ref: '#/channels/hitokotoAppended'
+    messages:
+      - $ref: '#/channels/hitokotoAppended/messages/hitokotoAppended'
+    bindings:
+      amqp:
+        ack: true
+        bindingVersion: 0.3.0
+    x-consumer:
+      tag: HitokotoAppendedNotificationWorker
+      ackByError: true
+
+  receiveHitokotoReviewed:
+    action: receive
+    channel:
+      $ref: '#/channels/hitokotoReviewed'
+    messages:
+      - $ref: '#/channels/hitokotoReviewed/messages/hitokotoReviewed'
+    bindings:
+      amqp:
+        ack: true
+        bindingVersion: 0.3.0
+    x-consumer:
+      tag: HitokotoReviewedNotificationWorker
+      ackByError: true
+
+  receiveHitokotoMoved:
+    action: receive
+    channel:
+      $ref: '#/channels/hitokotoMoved'
+    messages:
+      - $ref: '#/channels/hitokotoMoved/messages/hitokotoMoved'
+    bindings:
+      amqp:
+        ack: true
+        bindingVersion: 0.3.0
+    x-consumer:
+      tag: HitokotoMovedNotificationWorker
+      ackByError: true
+
+  receiveHitokotoPollCreated:
+    action: receive
+    channel:
+      $ref: '#/channels/hitokotoPollCreated'
+    messages:
+      - $ref: '#/channels/hitokotoPollCreated/messages/pollCreated'
+    bindings:
+      amqp:
+        ack: true
+        bindingVersion: 0.3.0
+    x-consumer:
+      tag: HitokotoPollCreatedNotificationWorker
+      ackByError: true
+
+  receiveHitokotoPollFinished:
+    action: receive
+    channel:
+      $ref: '#/channels/hitokotoPollFinished'
+    messages:
+      - $ref: '#/channels/hitokotoPollFinished/messages/pollFinished'
+    bindings:
+      amqp:
+        ack: true
+        bindingVersion: 0.3.0
+    x-consumer:
+      tag: HitokotoPollFinishedNotificationWorker
+      ackByError: true
+
+  receiveHitokotoPollDailyReport:
+    action: receive
+    channel:
+      $ref: '#/channels/hitokotoPollDailyReport'
+    messages:
+      - $ref: '#/channels/hitokotoPollDailyReport/messages/pollDailyReport'
+    bindings:
+      amqp:
+        ack: true
+        bindingVersion: 0.3.0
+    x-consumer:
+      tag: HitokotoPollDailyReportNotificationWorker
+      ackByError: true
+
+  receiveNotificationFailedCollector:
+    action: receive
+    channel:
+      $ref: '#/channels/notificationFailedCollector'
+    messages:
+      - $ref: '#/channels/notificationFailedCollector/messages/notificationFailedCollector'
+    bindings:
+      amqp:
+        ack: true
+        bindingVersion: 0.3.0
+    x-consumer:
+      tag: HitokotoFailedMessageCollectWorker
+      ackByError: true
+      prefetch: 8
+      note: |
+        prefetch 必须限制：handler 会阻塞式 sleep 最长 4^5 秒做退避，不限并发会占满 worker。
+        本 tag 与死信桶 consumer 的 tag 重复，是消费侧现存事实，此处照实记录、不做"修正"。
+
+  receiveNotificationFailedCan:
+    action: receive
+    channel:
+      $ref: '#/channels/notificationFailedCan'
+    messages:
+      - $ref: '#/channels/notificationFailedCan/messages/notificationFailedCan'
+    bindings:
+      amqp:
+        ack: true
+        bindingVersion: 0.3.0
+    x-consumer:
+      tag: HitokotoFailedMessageCollectWorker
+      ackByError: true
+      note: 与死信收集器共用同一个 consumer tag，是消费侧现存事实，此处照实记录。
+
+components:
+  messages:
+    hitokotoAppended:
+      name: HitokotoAppendedMessage
+      title: 句子投稿成功
+      contentType: application/json
+      payload:
+        $ref: './schemas/hitokoto-appended.schema.json'
+
+    hitokotoReviewed:
+      name: HitokotoReviewedMessage
+      title: 句子审核完成
+      contentType: application/json
+      payload:
+        $ref: './schemas/hitokoto-reviewed.schema.json'
+
+    hitokotoMoved:
+      name: HitokotoMovedMessage
+      title: 句子被移动分类
+      contentType: application/json
+      payload:
+        $ref: './schemas/hitokoto-moved.schema.json'
+
+    pollCreated:
+      name: PollCreatedMessage
+      title: 投票创建
+      contentType: application/json
+      payload:
+        $ref: './schemas/poll-created.schema.json'
+
+    pollFinished:
+      name: PollFinishedMessage
+      title: 投票结束
+      contentType: application/json
+      payload:
+        $ref: './schemas/poll-finished.schema.json'
+
+    pollDailyReport:
+      name: PollDailyReportMessage
+      title: 每日审核员报告
+      contentType: application/json
+      payload:
+        $ref: './schemas/poll-daily-report.schema.json'
+
+    notificationFailedCollector:
+      name: NotificationFailedCollectorMessage
+      title: 死信（原始业务消息）
+      contentType: application/json
+      description: |
+        用 `anyOf` 而非 `oneOf`：底座宽松，`hitokoto_moved` / `hitokoto_reviewed` 的消息
+        同时也满足 `hitokoto_appended` 的 schema，`oneOf` 会因"匹配多个"而误判失败。
+      payload:
+        anyOf:
+          - $ref: './schemas/hitokoto-appended.schema.json'
+          - $ref: './schemas/hitokoto-reviewed.schema.json'
+          - $ref: './schemas/hitokoto-moved.schema.json'
+          - $ref: './schemas/poll-created.schema.json'
+          - $ref: './schemas/poll-finished.schema.json'
+          - $ref: './schemas/poll-daily-report.schema.json'
+
+    notificationFailedCan:
+      name: NotificationFailedCanMessage
+      title: 死信桶包装体
+      contentType: application/json
+      payload:
+        $ref: './schemas/notification-failed-can.schema.json'

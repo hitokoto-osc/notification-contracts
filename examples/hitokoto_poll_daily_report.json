@@ -1,0 +1,25 @@
+{
+  "created_at": "2026-08-23 08:00:00",
+  "to": "reviewer@example.com",
+  "user_name": "审核员甲",
+  "system_information": {
+    "total": 128,
+    "process_total": 47,
+    "process_accept": 30,
+    "process_reject": 12,
+    "process_need_edited": 5
+  },
+  "user_information": {
+    "polled": {
+      "total": 18,
+      "accept": 11,
+      "reject": 5,
+      "need_edited": 2
+    },
+    "waiting": 6,
+    "accepted": 9,
+    "rejected": 2,
+    "in_need_edited": 1,
+    "wait_for_polling": 110
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "PollStatus",
+  "description": "投票状态。取值不连续，分三段：0-2 为投票生命周期，100-102 为人工干预态，200-202 为终结态。\n\n| 值 | 名称 | 含义 |\n| --- | --- | --- |\n| `-1` | Unknown | 未知，比如投票不存在 |\n| `0` | NotOpen | 未开放投票 |\n| `1` | Open | 投票正常开放 |\n| `2` | Processing | 处理中，停止投票 |\n| `100` | Suspended | 暂停投票 |\n| `101` | Closed | 关闭投票 |\n| `102` | OpenForCommonUser | 开放给普通用户投票 |\n| `200` | Approved | 赞同（入库） |\n| `201` | Rejected | 驳回 |\n| `202` | NeedModify | 需要修改 |",
+  "type": "integer",
+  "enum": [
+    -1,
+    0,
+    1,
+    2,
+    100,
+    101,
+    102,
+    200,
+    201,
+    202
+  ],
+  "x-enumNames": [
+    "Unknown",
+    "NotOpen",
+    "Open",
+    "Processing",
+    "Suspended",
+    "Closed",
+    "OpenForCommonUser",
+    "Approved",
+    "Rejected",
+    "NeedModify"
+  ]
+}

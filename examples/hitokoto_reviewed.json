@@ -1,0 +1,14 @@
+{
+  "to": "a632079@qq.com",
+  "uuid": "701fd013-65eb-4813-85e3-0f74bc53a95f",
+  "hitokoto": "落霞与孤鹜齐飞，秋水共长天一色。",
+  "from": "滕王阁序",
+  "from_who": "王勃",
+  "type": "i",
+  "creator": "测试用户",
+  "created_at": "1696347595",
+  "operated_at": "1696347600",
+  "reviewer_name": "审核员甲",
+  "reviewer_uid": 42,
+  "status": 200
+}

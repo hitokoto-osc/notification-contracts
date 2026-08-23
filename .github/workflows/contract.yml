@@ -1,0 +1,89 @@
+name: Contract
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    name: Validate and diff
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out candidate
+        uses: actions/checkout@v7
+        with:
+          path: candidate
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      # @asyncapi/cli v6 要求 Node >= 24；pnpm 版本由 package.json 的 packageManager 钉死。
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install candidate dependencies
+        working-directory: candidate
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate candidate
+        working-directory: candidate
+        run: pnpm test
+
+      # baseline 与 candidate 各自 bundle：外置 $ref 必须在各自 revision 下解析，
+      # 否则会拿 candidate 的 schema 去解析 baseline 的引用，diff 结果失真。
+      - name: Bundle candidate
+        working-directory: candidate
+        run: pnpm run bundle
+
+      - name: Check out baseline
+        if: github.event_name == 'pull_request'
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: baseline
+
+      # 契约仓建立之前的历史提交没有 asyncapi.yaml，首个 PR 不该因此红。
+      - name: Detect baseline contract
+        id: baseline
+        if: github.event_name == 'pull_request'
+        run: |
+          if [ -f baseline/asyncapi.yaml ]; then
+            echo 'present=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'present=false' >> "$GITHUB_OUTPUT"
+            echo '::notice::baseline 无 asyncapi.yaml，跳过 diff 与拓扑比对。'
+          fi
+
+      - name: Install baseline dependencies
+        if: steps.baseline.outputs.present == 'true'
+        working-directory: baseline
+        run: pnpm install --frozen-lockfile
+
+      - name: Bundle baseline
+        if: steps.baseline.outputs.present == 'true'
+        working-directory: baseline
+        run: pnpm run bundle
+
+      - name: Reject breaking AsyncAPI changes
+        if: steps.baseline.outputs.present == 'true'
+        working-directory: candidate
+        run: pnpm exec asyncapi diff ../baseline/dist/asyncapi.bundled.yaml dist/asyncapi.bundled.yaml --type breaking
+
+      # 上一步覆盖不到拓扑：queue 名、DLX 参数、consumer tag、prefetch 都放在
+      # x-rabbitmq-queue / x-consumer 扩展里，实测 `asyncapi diff` 能看见这些改动
+      # 但归类为非破坏，`--type breaking` 因此不会拦。这一步是必需的兜底，不是冗余。
+      - name: Reject RabbitMQ topology changes
+        if: >-
+          steps.baseline.outputs.present == 'true' &&
+          !contains(github.event.pull_request.labels.*.name, 'topology-change')
+        working-directory: candidate
+        run: node scripts/check-topology-compat.mjs ../baseline/asyncapi.yaml asyncapi.yaml

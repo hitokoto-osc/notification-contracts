@@ -1,0 +1,39 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "HitokotoReviewedMessage",
+  "description": "句子被审核员处理后的通知。",
+  "allOf": [
+    {
+      "$ref": "./common/hitokoto-base.schema.json"
+    }
+  ],
+  "type": "object",
+  "required": [
+    "operated_at",
+    "reviewer_name",
+    "reviewer_uid"
+  ],
+  "properties": {
+    "operated_at": {
+      "$ref": "./common/time.schema.json"
+    },
+    "reviewer_name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "审核员名称。"
+    },
+    "reviewer_uid": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "审核员用户标识。消费侧标了 `validate:\"required\"`，对整数而言等价于「非 0」。"
+    },
+    "status": {
+      "allOf": [
+        {
+          "$ref": "./enums/poll-status.schema.json"
+        }
+      ],
+      "description": "审核结果，典型取值 `200`（通过）/ `201`（驳回）。\n\n**未列入 `required`**：消费侧这个字段没有 `validate` 标签，缺失时会落到零值 `0`（NotOpen）。这是已知的偏松处，见 CHANGELOG。"
+    }
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "header": {
+    "x-death": [
+      {
+        "count": 6,
+        "exchange": "notification",
+        "queue": "hitokoto_appended",
+        "reason": "rejected",
+        "routing-keys": [
+          "notification.hitokoto_appended"
+        ],
+        "time": "2026-08-23T08:00:00Z"
+      }
+    ],
+    "x-first-death-exchange": "notification",
+    "x-first-death-queue": "hitokoto_appended",
+    "x-first-death-reason": "rejected"
+  },
+  "body": "{\n  \"to\": \"a632079@qq.com\",\n  \"uuid\": \"701fd013-65eb-4813-85e3-0f74bc53a95f\",\n  \"hitokoto\": \"落霞与孤鹜齐飞，秋水共长天一色。\",\n  \"from\": \"滕王阁序\",\n  \"from_who\": \"王勃\",\n  \"type\": \"i\",\n  \"creator\": \"测试用户\",\n  \"created_at\": \"1696347595\"\n}"
+}

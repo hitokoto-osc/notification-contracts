@@ -1,0 +1,119 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "PollDailyReportMessage",
+  "description": "每日审核员报告。\n\n**不含句子信息底座**：消费侧类型没有内嵌 `HitokotoBaseMessage`，因此没有 `uuid` / `hitokoto` / `type` 等字段。",
+  "type": "object",
+  "required": [
+    "created_at",
+    "to",
+    "user_name",
+    "system_information",
+    "user_information"
+  ],
+  "properties": {
+    "created_at": {
+      "$ref": "./common/time.schema.json"
+    },
+    "to": {
+      "type": "string",
+      "format": "email",
+      "description": "收信人邮件地址。"
+    },
+    "user_name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "收信审核员的名称。"
+    },
+    "system_information": {
+      "type": "object",
+      "description": "平台整体情况。内层计数字段在消费侧均无 `validate` 标签，缺失时落到零值，因此不列入 `required`——但生产者应当全部发送。",
+      "properties": {
+        "total": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "平台当前剩余的投票数目。"
+        },
+        "process_total": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "平台处理了的投票数目（过去 24 小时）。"
+        },
+        "process_accept": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "平台处理为入库的投票数目（过去 24 小时）。"
+        },
+        "process_reject": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "平台处理为驳回的投票数目（过去 24 小时）。"
+        },
+        "process_need_edited": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "平台处理为亟待修改的投票数目（过去 24 小时）。"
+        }
+      }
+    },
+    "user_information": {
+      "type": "object",
+      "description": "收信审核员个人情况。",
+      "required": [
+        "polled"
+      ],
+      "properties": {
+        "polled": {
+          "type": "object",
+          "description": "该审核员在过去 24 小时参与的投票。",
+          "properties": {
+            "total": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "参与投票的总数。"
+            },
+            "accept": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "投批准票的数目。"
+            },
+            "reject": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "投拒绝票的数目。"
+            },
+            "need_edited": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "投需要修改票的数目。"
+            }
+          }
+        },
+        "waiting": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "等待其他用户参与的投票数目（基于已投票的数目）。"
+        },
+        "accepted": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "已入库的投票数目（基于已投票的数目）。"
+        },
+        "rejected": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "已驳回的投票数目（基于已投票的数目）。"
+        },
+        "in_need_edited": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "已进入亟待修改状态的投票数目（基于已投票的数目）。"
+        },
+        "wait_for_polling": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "基于剩余投票数目计算出的等待投票数目。"
+        }
+      }
+    }
+  }
+}
