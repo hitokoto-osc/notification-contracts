@@ -9,12 +9,15 @@
   ],
   "properties": {
     "header": {
-      "type": "object",
-      "description": "原始 delivery 的 AMQP headers，含 broker 注入的 `x-death` / `x-first-death-exchange` / `x-first-death-queue`。"
+      "type": [
+        "object",
+        "null"
+      ],
+      "description": "原始 delivery 的 AMQP headers，含 broker 注入的 `x-death` / `x-first-death-exchange` / `x-first-death-queue`。\n\n**可能是 `null`**：`wrapperHeader` 直接序列化 `delivery.Headers`，消息本身没有头部时该字段就是 `null`——而头部无法解析恰恰是消息被转投死信桶的主要原因之一。"
     },
     "body": {
       "type": "string",
-      "description": "原始消息体，**以 JSON 字符串形式内嵌**（不是嵌套对象）。需要先解析外层，再对本字段做一次 JSON 解析。"
+      "description": "原始消息体，**以 JSON 字符串形式内嵌**（不是嵌套对象）。需要先解析外层，再对本字段做一次 JSON 解析。\n\n**可能是空串**：原始消息体为空时 `string(body)` 就是 `\"\"`。"
     }
   }
 }

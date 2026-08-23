@@ -1,6 +1,45 @@
 # Changelog
 
 本文件记录契约的所有值得注意的变更，遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
+## [1.2.0]
+
+多模型审计后的修正。全部是**放宽**，既有合规流量不受影响。
+
+### Changed
+
+- `hitokoto_reviewed.reviewer_uid`、`poll_finished.id`、`poll_finished.point` 由 `minimum: 1`
+  改为 `not: { const: 0 }`。消费侧这三个字段是有符号 `int` 且只标了 `required`，Go 只拒 `0`、
+  不拒负数；原来的 `minimum: 1` 比消费侧更严，不是照相。
+- `poll_daily_report` 的 14 个计数字段去掉 `minimum: 0`。消费侧既无 `validate` 标签也非无符号
+  类型，这个下界是凭空发明的。
+- `notification_failed_can.header` 接受 `null`。`wrapperHeader` 直接序列化 `delivery.Headers`，
+  消息没有头部时该字段就是 `null`——而头部无法解析恰恰是消息被转投死信桶的主要原因之一，
+  这条路径完全可达，原来的 schema 会把死信桶里的真实消息判成不合规。
+
+### Tooling
+
+- `validate-examples.mjs` 现在从 `asyncapi.yaml` 解析 `channel → message → payload $ref`，
+  样本按 channel 而非写死的 schema 文件名校验。此前把某条 message 的 payload 改指到别的
+  schema，所有检查都会全绿——没有任何 schema 文件发生变化。同时新增：每个 channel 必须被
+  恰好一个 operation 引用；死信收集器的 `anyOf` 必须真能接住六条业务样本；
+  `x-enumNames` 的长度、标识符合法性与 `description` 表格的取值覆盖必须与 `enum` 一致。
+- `check-payload-compat.mjs` 大幅加固：fail closed（读不到目录直接炸，不再退化成放行）、
+  比对 `$ref` 与全部约束关键字、`allOf`/`anyOf` 按无序分支集合比对（消除下标漂移与重排假阳性）、
+  `type` 按集合包含判断（`"object"` → `["object","null"]` 是放宽）。
+  新增「需人工确认」分类：同一节点上既加约束又删约束时方向无法自动判定，用 `compat-reviewed`
+  标签放行且不要求升 MAJOR。
+- `check-major-bump.mjs`：打了 `topology-change` / `breaking-change` 的 PR 必须真的升 MAJOR。
+  此前标签只是关掉门禁的开关，破坏性改动可以贴着标签停在原版本号合入。
+- CI 的三道兼容性门禁现在被标签统一让路。此前打了 `topology-change` 的 PR 仍会被
+  `asyncapi diff` 拦下，逃生门等于不存在。
+
+### Docs
+
+- README §1 拆出死信路由（那张表的读者是外部生产方），首屏给出可直接复制的完整载荷，
+  并显式警告时间字段是字符串。
+- README §3 增加 `event_id` / `uuid` / `id` 三类标识符对照表。
+- `.gitattributes` 修正角色：那四个服务是**生产方**，`notification_worker` 是唯一消费方。
+
 
 ## [1.1.0]
 

@@ -21,15 +21,34 @@ hitokoto-osc 通知域 RabbitMQ 消息契约的**单一事实源**。
 | 投票创建 | `notification` | `notification.hitokoto_poll_created` | `hitokoto_poll_created` | [`poll-created`](schemas/poll-created.schema.json) | [样本](examples/hitokoto_poll_created.json) |
 | 投票结束 | `notification` | `notification.hitokoto_poll_finished` | `hitokoto_poll_finished` | [`poll-finished`](schemas/poll-finished.schema.json) | [样本](examples/hitokoto_poll_finished.json) |
 | 每日审核员报告 | `notification` | `notification.hitokoto_poll_daily_report` | `hitokoto_poll_daily_report` | [`poll-daily-report`](schemas/poll-daily-report.schema.json) | [样本](examples/hitokoto_poll_daily_report.json) |
-| 死信收集器 | `notification_failed` | `notification_failed.notification_failed_collector` | `notification_failed_collector` | 六个业务 schema 的 `anyOf` | — |
-| 死信桶 | `notification_failed` | `notification_failed.notification_failed_can` | `notification_failed_can` | [`notification-failed-can`](schemas/notification-failed-can.schema.json) | [样本](examples/notification_failed_can.json) |
 
-> 最后两行由 `notification_worker` 自己使用，**外部生产者不要往这两个 routing key 发消息**。
-
-两个 exchange 都是 `direct` + `durable`。八个队列都是 `durable`，且都把死信指向
+`notification` exchange 是 `direct` + `durable`，六个队列都是 `durable`，且都把死信指向
 `notification_failed` / `notification_failed.notification_failed_collector`。
 
-**第二步**：复制 `examples/<事件>.json`，把值换成你的。所有消息都是 `application/json`。
+> `queue` 一列只是给排障时对照用的。**生产者不需要也不应该声明队列**——AMQP 0-9-1 发布消息
+> 只需要 exchange 与 routing key，队列由 `notification_worker` 启动时声明。
+
+> 死信收集器与死信桶那两条路由由 `notification_worker` 内部使用，见 [§5 死信机制](#5-死信机制)。
+
+**第二步**：抄下面这段，把值换成你的。所有消息都是 `application/json`。
+
+```json
+{
+  "to": "a632079@qq.com",
+  "uuid": "701fd013-65eb-4813-85e3-0f74bc53a95f",
+  "hitokoto": "落霞与孤鹜齐飞，秋水共长天一色。",
+  "from": "滕王阁序",
+  "from_who": "王勃",
+  "type": "i",
+  "creator": "测试用户",
+  "created_at": "1696347595"
+}
+```
+
+> ⚠️ **`created_at` 是字符串，不是整数。** PHP 里顺手写 `time()`、JS 里写 `Date.now()` 都会
+> 得到数字，消费侧会直接判错并把消息打进死信。记得 `(string)` / `String(...)` 一下。
+
+其余五个事件在上面的表格里各有一份完整样本，格式同理——都是这个底座加几个字段。
 
 **第三步**（可选）：把 `schemas/` 目录 vendor 进你的项目，用任意 JSON Schema（draft-07）库
 在发送前自校验一次。
@@ -81,7 +100,7 @@ hitokoto-osc 通知域 RabbitMQ 消息契约的**单一事实源**。
 | `102` | OpenForCommonUser | 开放给普通用户投票 |
 | `200` | Approved | 赞同（入库） |
 | `201` | Rejected | 驳回 |
-| `202` | NeedModify | 需要修改 |
+| `202` | NeedModify | 需要修改（邮件里显示为「亟待修改」） |
 
 ### PollMethod（审核员投票方式，整数）
 
@@ -104,16 +123,26 @@ hitokoto-osc 通知域 RabbitMQ 消息契约的**单一事实源**。
 { "event_id": "0191d9c6-6f7c-7c3a-9f4e-3f5b2c1d8a90", "to": "..." }
 ```
 
-它是这条事件的不可变身份，语义对齐 CloudEvents 的 `id`。三条规则：
+同一条消息里最多会同时出现三个「标识符」，先把它们分清楚：
+
+| 字段 | 类型 | 必填 | 标识的是 | 出现在 |
+| --- | --- | --- | --- | --- |
+| `event_id` | UUID 字符串（建议 v7） | 否 | **这次事件**，重发时复用同一值 | 所有消息 |
+| `uuid` | UUID 字符串（**必须 v4**） | 是 | **那句一言**，句子的永久标识 | 五条句子相关消息（每日报告除外） |
+| `id` | 整数 | 是 | **那次投票**，投票记录的主键 | `poll_created` / `poll_finished` |
+
+最常见的错误是把 `id` 当成事件标识来填。它不是——它是投票记录的整数主键，
+同一次投票的「创建」和「结束」两条事件共享同一个 `id`，但它们是两次不同的事件。
+
+`event_id` 是这条事件的不可变身份，语义对齐 CloudEvents 的 `id`。三条规则：
 
 1. **推荐 UUIDv7**。自带时间序，消费侧可以按前缀清理去重桶。
 2. **重发必须复用同一个值**。同一逻辑事件重试、补发、回放时换了新值，去重就失效了。
 3. **不填也合法**。消费侧此时回退到对规范化字段求哈希的启发式去重键，
    精度低于精确幂等——能填就填。
 
-> **别和 `id` 搞混。** `poll_created` / `poll_finished` 里的 `id` 是**整数投票标识**，
-> 与事件身份无关。契约刻意没有复用 `id` 这个名字：它在这两条消息里已经被整数占用，
-> 再塞一个字符串进去会产生同一字段要求两种类型的不可满足 schema。
+> 契约刻意没有复用 `id` 这个名字：它在这两条消息里已经被整数占用，再塞一个字符串进去
+> 会产生同一字段同时要求 string 与 integer 的不可满足 schema。
 
 ---
 
@@ -151,6 +180,13 @@ hitokoto-osc 通知域 RabbitMQ 消息契约的**单一事实源**。
                                                            ▼
                                               notification_failed_can
 ```
+
+这两条路由由 `notification_worker` 内部使用，**外部生产者不要往这里发消息**：
+
+| 用途 | exchange | routing key | queue | schema |
+| --- | --- | --- | --- | --- |
+| 死信收集器 | `notification_failed` | `notification_failed.notification_failed_collector` | `notification_failed_collector` | 六个业务 schema 的 `anyOf` |
+| 死信桶 | `notification_failed` | `notification_failed.notification_failed_can` | `notification_failed_can` | [`notification-failed-can`](schemas/notification-failed-can.schema.json) |
 
 两个要点，最容易踩：
 
@@ -229,15 +265,30 @@ CI 会做的事：
 1. candidate 与 baseline **各自** `pnpm install` + `pnpm test` + `pnpm run bundle`
    （外置 `$ref` 必须在各自 revision 下解析，否则 diff 失真）
 2. `asyncapi diff baseline candidate --type breaking --overrides diff-overrides.json`
-3. `scripts/check-topology-compat.mjs` —— 拓扑逐字段比对（`topology-change` 标签可跳过）
-4. `scripts/check-payload-compat.mjs` —— payload 收紧检测（`breaking-change` 标签可跳过）
+3. `scripts/check-topology-compat.mjs` —— 拓扑逐字段比对
+4. `scripts/check-payload-compat.mjs` —— payload 收紧检测
+
+### 三个标签
+
+| 标签 | 让路的门禁 | 是否强制升 MAJOR | 什么时候用 |
+| --- | --- | --- | --- |
+| `topology-change` | 全部三道 | **是** | 真的要改 routing key / queue / exchange / DLX |
+| `breaking-change` | 全部三道 | **是** | 真的要收紧 payload：加必填字段、删枚举取值、加新约束 |
+| `compat-reviewed` | 只让路 payload 那一道 | 否 | 检查报了「约束被替换」，人工确认其实是等价改写或放宽 |
+
+前两个标签会额外触发 `scripts/check-major-bump.mjs`——标签的意思是「我知道这是破坏性变更」，
+不是「跳过版本纪律」。第三个不会，因为它对应的本来就不是破坏性变更。
+
+为什么需要第三个：payload 检查判断不了「同一节点上删了一个约束又加了一个」的方向。
+把 `minimum: 1` 换成 `not: {const: 0}` 其实是放宽，但脚本只能报「需人工确认」；
+若唯一的出口是 `breaking-change`，一次纯放宽就会被逼着升 MAJOR。
 
 ### SemVer 判定
 
 | 改动 | 版本 |
 | --- | --- |
 | 加一个可选字段、放宽约束、补文档 | MINOR |
-| 收紧约束、加必填字段、改枚举取值 | MAJOR，且必须打 `breaking-change` 标签 |
+| 收紧约束、加必填字段、删枚举取值 | MAJOR，且必须打 `breaking-change` 标签 |
 | 改 routing key / queue / exchange / DLX | MAJOR，且必须打 `topology-change` 标签 |
 | 纯 description / 样本修正 | PATCH |
 
@@ -269,7 +320,8 @@ git submodule add -b main https://github.com/hitokoto-osc/notification-contracts
 `schemas/` 下都是标准 JSON Schema draft-07，跨文件引用是相对路径，vendor 进去即可用，
 不需要任何 AsyncAPI 工具。
 
-**渲染文档**：每次推 `main` 由 `docs.yml` 生成并发布到 GitHub Pages。生成物不提交进仓库。
+**渲染文档**：<https://hitokoto-osc.github.io/notification-contracts/>，每次推 `main` 由 `docs.yml`
+重新生成。生成物不提交进仓库。
 
 ---
 

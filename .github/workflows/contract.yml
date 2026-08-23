@@ -60,7 +60,28 @@ jobs:
             echo 'present=true' >> "$GITHUB_OUTPUT"
           else
             echo 'present=false' >> "$GITHUB_OUTPUT"
-            echo '::notice::baseline 无 asyncapi.yaml，跳过 diff 与拓扑比对。'
+            echo '::notice::baseline 无 asyncapi.yaml，跳过 diff 与兼容性比对。'
+          fi
+
+      # 两个标签是同一件事的两种粒度：「我知道这是破坏性变更，已按流程处理」。
+      # 任一存在时三道兼容性门禁一起让路——否则打了 topology-change 的 PR 仍会被
+      # asyncapi diff 拦下，逃生门等于不存在——改由 check-major-bump 强制版本纪律。
+      - name: Detect declared breaking change
+        id: intent
+        if: steps.baseline.outputs.present == 'true'
+        env:
+          DECLARED: ${{ contains(github.event.pull_request.labels.*.name, 'topology-change') || contains(github.event.pull_request.labels.*.name, 'breaking-change') }}
+          # compat-reviewed 只豁免 payload 那一道，且**不**要求升 MAJOR。
+          # 它是给「约束被等价改写、方向无法自动判定」用的——比如 `minimum: 1` 换成
+          # `not: {const: 0}`，那其实是放宽，不该被逼着升 MAJOR。
+          REVIEWED: ${{ contains(github.event.pull_request.labels.*.name, 'compat-reviewed') }}
+        run: |
+          echo "declared=$DECLARED" >> "$GITHUB_OUTPUT"
+          echo "reviewed=$REVIEWED" >> "$GITHUB_OUTPUT"
+          if [ "$DECLARED" = 'true' ]; then
+            echo '::notice::PR 已声明破坏性变更：兼容性门禁让路，改为强制 MAJOR 递增。'
+          elif [ "$REVIEWED" = 'true' ]; then
+            echo '::notice::PR 已标记兼容性人工复核：payload 门禁让路，仍要求非破坏。'
           fi
 
       - name: Install baseline dependencies
@@ -73,30 +94,35 @@ jobs:
         working-directory: baseline
         run: pnpm run bundle
 
+      # 下面三步各管一段，谁都不能少。实测 `asyncapi diff --type breaking` 的覆盖面
+      # 比预期窄得多：
+      #   channel.address（routing key）  → 判为 breaking，拦得住
+      #   x-rabbitmq-queue 里的 DLX 等     → 只出现在 --type all，拦不住
+      #   payload 的 required 新增字段     → 返回 [] 且 exit 0，完全无感
+      #   info.version 递增               → 误判为 breaking（已由 diff-overrides.json 修正）
       - name: Reject breaking AsyncAPI changes
-        if: steps.baseline.outputs.present == 'true'
+        if: steps.baseline.outputs.present == 'true' && steps.intent.outputs.declared != 'true'
         working-directory: candidate
         run: >-
           pnpm exec asyncapi diff
           ../baseline/dist/asyncapi.bundled.yaml dist/asyncapi.bundled.yaml
           --type breaking --overrides diff-overrides.json
 
-      # 下面两步不是冗余。实测 `asyncapi diff --type breaking` 的覆盖面比预期窄得多：
-      #   channel.address（routing key）  → 判为 breaking，拦得住
-      #   x-rabbitmq-queue 里的 DLX 等     → 只出现在 --type all，拦不住
-      #   payload 的 required 新增字段     → 返回 [] 且 exit 0，完全无感
-      #   info.version 递增               → 误判为 breaking（已由 diff-overrides.json 修正）
-      # 拓扑与 payload 兼容性因此各自需要一个自写断言兜底。
       - name: Reject RabbitMQ topology changes
-        if: >-
-          steps.baseline.outputs.present == 'true' &&
-          !contains(github.event.pull_request.labels.*.name, 'topology-change')
+        if: steps.baseline.outputs.present == 'true' && steps.intent.outputs.declared != 'true'
         working-directory: candidate
         run: node scripts/check-topology-compat.mjs ../baseline/asyncapi.yaml asyncapi.yaml
 
       - name: Reject breaking payload changes
         if: >-
           steps.baseline.outputs.present == 'true' &&
-          !contains(github.event.pull_request.labels.*.name, 'breaking-change')
+          steps.intent.outputs.declared != 'true' &&
+          steps.intent.outputs.reviewed != 'true'
         working-directory: candidate
         run: node scripts/check-payload-compat.mjs ../baseline/schemas schemas
+
+      # 标签的作用是「我知道这是破坏性变更」，不是「跳过版本纪律」。
+      - name: Require MAJOR bump for declared breaking changes
+        if: steps.intent.outputs.declared == 'true'
+        working-directory: candidate
+        run: node scripts/check-major-bump.mjs ../baseline/asyncapi.yaml asyncapi.yaml

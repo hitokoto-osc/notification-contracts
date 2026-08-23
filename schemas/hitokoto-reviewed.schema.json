@@ -24,8 +24,10 @@
     },
     "reviewer_uid": {
       "type": "integer",
-      "minimum": 1,
-      "description": "审核员用户标识。消费侧标了 `validate:\"required\"`，对整数而言等价于「非 0」。"
+      "not": {
+        "const": 0
+      },
+      "description": "审核员用户标识。消费侧类型是 `int` 且标了 `validate:\"required\"`，对整数而言等价于「非 0」——负数消费侧其实也收，这里如实照抄，不额外收紧。"
     },
     "status": {
       "allOf": [

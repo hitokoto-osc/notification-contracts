@@ -1,17 +1,22 @@
 ## 变更内容
 
-<!-- 改了什么，为什么。受影响的生产方/消费方有哪些。 -->
+<!-- 改了什么，为什么。受影响的生产方 / 消费方有哪些。 -->
 
-## 兼容性
+## 自查
 
-- [ ] 已按 README §7 的 SemVer 表判定版本，并同步更新了 `asyncapi.yaml` 的 `info.version`
-      与 `package.json` 的 `version`
+- [ ] 版本号已按 [README §7 的 SemVer 表](../README.md#7-我要改契约)判定，
+      `asyncapi.yaml` 的 `info.version` 与 `package.json` 的 `version` 已同步
 - [ ] CHANGELOG 已更新
-- [ ] 未改动 routing key / queue / exchange / DLX 参数
-      （若确有改动：已打 `topology-change` 标签，已升 MAJOR，已在描述里写明四语言迁移步骤）
-- [ ] required 字段与枚举取值仍与线上消费侧行为一致
-      （若确有收紧：已打 `breaking-change` 标签，已升 MAJOR）
-- [ ] 新增/修改字段已同步补进 `examples/`；若是收紧约束，已补 `examples/invalid/` 负样本
+- [ ] 新增 / 修改的字段已补进 `examples/`；若是收紧约束，已补 `examples/invalid/` 负样本
+
+## 这是破坏性变更吗
+
+破坏性变更指：改 routing key / queue / exchange / DLX 参数，或收紧 payload
+（新增必填字段、删除枚举取值、加新约束）。
+
+- [ ] **不是。** CI 的三道兼容性门禁应当全绿。
+- [ ] **是。** 已打上 `topology-change` 或 `breaking-change` 标签，已升 MAJOR，
+      并在上面写明了四语言生产方的迁移步骤。
 
 ## 消费方验证
 

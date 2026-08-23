@@ -19,8 +19,10 @@
   "properties": {
     "id": {
       "type": "integer",
-      "minimum": 1,
-      "description": "**投票标识（整数）**，不是事件标识。事件身份请用 `event_id`。"
+      "not": {
+        "const": 0
+      },
+      "description": "**投票标识（整数）**，不是事件标识；事件身份请用 `event_id`。消费侧类型是 `int` 且标了 `validate:\"required\"`，等价于「非 0」。"
     },
     "updated_at": {
       "$ref": "./common/time.schema.json"
@@ -53,8 +55,10 @@
     },
     "point": {
       "type": "integer",
-      "minimum": 1,
-      "description": "该审核员投出的票数（权重）。消费侧标了 `validate:\"required\"`，等价于「非 0」。"
+      "not": {
+        "const": 0
+      },
+      "description": "该审核员投出的票数（权重）。消费侧类型是 `int` 且标了 `validate:\"required\"`，等价于「非 0」。"
     }
   }
 }

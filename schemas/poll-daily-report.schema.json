@@ -35,27 +35,22 @@
       "properties": {
         "total": {
           "type": "integer",
-          "minimum": 0,
           "description": "平台当前剩余的投票数目。"
         },
         "process_total": {
           "type": "integer",
-          "minimum": 0,
           "description": "平台处理了的投票数目（过去 24 小时）。"
         },
         "process_accept": {
           "type": "integer",
-          "minimum": 0,
           "description": "平台处理为入库的投票数目（过去 24 小时）。"
         },
         "process_reject": {
           "type": "integer",
-          "minimum": 0,
           "description": "平台处理为驳回的投票数目（过去 24 小时）。"
         },
         "process_need_edited": {
           "type": "integer",
-          "minimum": 0,
           "description": "平台处理为亟待修改的投票数目（过去 24 小时）。"
         }
       }
@@ -73,49 +68,40 @@
           "properties": {
             "total": {
               "type": "integer",
-              "minimum": 0,
               "description": "参与投票的总数。"
             },
             "accept": {
               "type": "integer",
-              "minimum": 0,
               "description": "投批准票的数目。"
             },
             "reject": {
               "type": "integer",
-              "minimum": 0,
               "description": "投拒绝票的数目。"
             },
             "need_edited": {
               "type": "integer",
-              "minimum": 0,
               "description": "投需要修改票的数目。"
             }
           }
         },
         "waiting": {
           "type": "integer",
-          "minimum": 0,
           "description": "等待其他用户参与的投票数目（基于已投票的数目）。"
         },
         "accepted": {
           "type": "integer",
-          "minimum": 0,
           "description": "已入库的投票数目（基于已投票的数目）。"
         },
         "rejected": {
           "type": "integer",
-          "minimum": 0,
           "description": "已驳回的投票数目（基于已投票的数目）。"
         },
         "in_need_edited": {
           "type": "integer",
-          "minimum": 0,
           "description": "已进入亟待修改状态的投票数目（基于已投票的数目）。"
         },
         "wait_for_polling": {
           "type": "integer",
-          "minimum": 0,
           "description": "基于剩余投票数目计算出的等待投票数目。"
         }
       }
